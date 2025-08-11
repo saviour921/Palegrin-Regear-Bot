@@ -12,9 +12,9 @@ from datetime import datetime
 MANUEL_ONAY_KANAL_ID = 1401852648357105715
 MINIMUM_IP = 1350
 YONETICI_IZNI = 'manage_guild' 
-ONAYLI_SETLER_DOSYASI = "onayli_setler_data.json"
-SET_IMAGES_KLASORU = "set_images"
-ANALYSIS_CACHE_KLASORU = "analysis_cache"
+ONAYLI_SETLER_DOSYASI = "/data/onayli_setler_data.json"
+SET_IMAGES_KLASORU = "/data/set_images"
+ANALYSIS_CACHE_KLASORU = "/data/analysis_cache"
 
 AI_ONAY_METNI = "SET ONAYLANDI"
 AI_RED_METNI = "SET HATALI"
@@ -59,11 +59,24 @@ async def analyze_image_with_ai(death_image_data):
     if not vision_model or not onayli_setler: return {"error": "AI modeli veya referans setleri yüklü değil."}
     try:
         prompt = f"""
-        Sen bir Albion Online ölüm raporu analiz uzmanısın. Görevin, verilen ölüm raporu (killboard) resmini detaylıca incelemek ve bilgileri bir JSON formatında çıkarmaktır.
-        ADIM 1: OYUNCU BİLGİLERİNİ OKU: Ölen oyuncunun adını `player_name` alanına, "Average Item Power" değerini `item_power` alanına yaz.
-        ADIM 2: SET ANALİZİ YAP: Oyuncunun giydiği 6 ana ekipmanı (Kafa, Zırh, Ayakkabı, Ana El, Yan El, Pelerin) verilen 'Referans Set' resimlerinden BİRİYLE karşılaştır. BİR PARÇA FARK TOLERANSI vardır. Kozmetik farkları (seviye, kalite, büyüleme) ÖNEMLİ DEĞİLDİR. Eğer set eşleşiyorsa, `status` alanına '{AI_ONAY_METNI}' yaz ve `matched_set` alanına eşleşen setin adını yaz. Eşleşmiyorsa, `status` alanına '{AI_RED_METNI}' yaz.
-        ÇIKTI FORMATI: Tüm cevabını, başka hiçbir ek metin olmadan, SADECE geçerli bir JSON objesi olarak ver.
-        {{ "player_name": "OyuncununAdı", "item_power": 1350, "status": "{AI_ONAY_METNI} veya {AI_RED_METNI}", "matched_set": "Eşleşen Setin Adı veya null" }}
+        Sen bir Albion Online ZvZ Regear Yetkilisin. Görevin, bir oyuncunun ölüm raporundaki 6 ana ekipmanını (Kafa, Zırh, Ayakkabı, Ana El, Yan El, Pelerin) verilen referans setlerle karşılaştırmak ve bir JSON çıktısı üretmektir.
+        İNCELEME SÜRECİ:
+        1. **Oyuncu Bilgilerini Oku:** Resimdeki ölen oyuncunun adını (`player_name`) ve "Average Item Power" değerini (`item_power`) bul.
+        2. **Karşılaştırma ve Sayım:** Oyuncunun setindeki 6 parçayı, SANA VERİLEN TÜM referans setleriyle tek tek karşılaştır. Her bir referans set için, oyuncunun setindeki kaç parçanın o referans setindeki parçalarla **AYNI TÜRDE** olduğunu say. (Örn: `Cleric Cowl` ile `Cleric Cowl` eşleşir, ama `Cleric Cowl` ile `Mage Cowl` eşleşmez).
+        3. **Karar Verme Kuralı:** Eğer **herhangi bir** referans set ile eşleşen parça sayısı **5 VEYA 6** ise, bu bir ONAYDIR. Eğer en iyi eşleşme sayısı **4 VEYA DAHA AZ** ise, bu bir RETTİR.
+        DİKKAT EDİLMESİ GEREKENLER:
+        - **GÖRMEZDEN GEL:** Ekipmanların seviyesi (Tier), kalitesi (Quality), gücü (Enchantment) gibi kozmetik farkları tamamen görmezden gel.
+        - **DAHİL ETME:** Çanta, binek, iksir gibi diğer slotları analize dahil etme.
+        ÇIKTI FORMATI:
+        Tüm cevabını, başka hiçbir ek metin olmadan, SADECE geçerli bir JSON objesi olarak ver.
+        - Onay durumunda: `status` alanına '{AI_ONAY_METNI}' yaz ve `matched_set` alanına en çok benzeyen setin adını yaz.
+        - Ret durumunda: `status` alanına '{AI_RED_METNI}' yaz.
+        {{
+          "player_name": "OyuncununAdı",
+          "item_power": 1350,
+          "status": "{AI_ONAY_METNI} veya {AI_RED_METNI}",
+          "matched_set": "Eşleşen Setin Adı veya null"
+        }}
         """
         death_image_part = {"mime_type": "image/png", "data": death_image_data}
         content_list = [prompt, "---", "Ölüm Raporu:", death_image_part, "---", "Referans Setler:"]
@@ -90,10 +103,8 @@ async def update_message_reactions(thread_id: int, message_id: int):
     if not message_data: return
     approved_count, pending_or_rejected_count = 0, 0
     for attachment_id, attachment_data in message_data.get("attachments", {}).items():
-        if "approved" in attachment_data.get("status", ""):
-            approved_count += 1
-        else:
-            pending_or_rejected_count += 1
+        if "approved" in attachment_data.get("status", ""): approved_count += 1
+        else: pending_or_rejected_count += 1
     try:
         thread_channel = client.get_channel(thread_id)
         if thread_channel:
@@ -101,8 +112,7 @@ async def update_message_reactions(thread_id: int, message_id: int):
             await message.clear_reactions()
             if approved_count > 0: await message.add_reaction('✅')
             if pending_or_rejected_count > 0: await message.add_reaction('❌')
-    except Exception as e:
-        print(f"Reaksiyon güncellenirken hata oluştu: {e}")
+    except Exception as e: print(f"Reaksiyon güncellenirken hata oluştu: {e}")
 
 # --- TÜM İNTERAKTİF ARAYÜZ SINIFLARI ---
 class SetSelectView(ui.View):
@@ -137,7 +147,6 @@ class ManualReviewView(ui.View):
             await interaction.response.send_message(f"Bu butonları sadece `{YONETICI_IZNI}` iznine sahip olanlar kullanabilir.", ephemeral=True)
             return False
         return True
-
     @ui.button(label="✅ Onayla", style=discord.ButtonStyle.success, custom_id="manual_approve_start")
     async def approve_button(self, interaction: discord.Interaction, button: ui.Button):
         if not await self.check_permission(interaction): return
@@ -148,7 +157,6 @@ class ManualReviewView(ui.View):
             await interaction.response.edit_message(view=select_view)
         except (IndexError, ValueError, KeyError):
              await interaction.response.send_message("Hata: Gerekli ID'ler okunamadı.", ephemeral=True)
-
     @ui.button(label="❌ Reddet", style=discord.ButtonStyle.danger, custom_id="manual_reject")
     async def reject_button(self, interaction: discord.Interaction, button: ui.Button):
         if not await self.check_permission(interaction): return
@@ -221,7 +229,7 @@ async def yardim(interaction: discord.Interaction):
     embed.add_field(name="🛠️ Yönetici Komutları", value="`/analiz-et`: Bir analiz oturumu başlatır.\n`/liste-olustur`: Mevcut oturumdaki onaylanmış talepleri listeler.\n`/set-resmi-ekle`: Yeni bir referans set ekler.\n`/set-sil`: Bir referans setini siler.\n`/setleri-goster`: Kayıtlı tüm setleri interaktif olarak gösterir.", inline=False)
     embed.set_footer(text="Palegrin Guild'i için özel olarak geliştirildi.")
     await interaction.response.send_message(embed=embed, ephemeral=True)
-
+    
 @client.tree.command(name="set-resmi-ekle", description="Onaylı bir regear setini resim olarak tanımlar.")
 async def set_resmi_ekle(interaction: discord.Interaction, set_adi: str, resim: discord.Attachment):
     await interaction.response.defer(thinking=True, ephemeral=True)
@@ -276,30 +284,30 @@ async def analiz_et(interaction: discord.Interaction):
         await interaction.response.send_message(embed=discord.Embed(title="❌ Hatalı Komut Kullanımı", description="Bu komut sadece bir **konu (thread)** içinde kullanılabilir.", color=ERROR_COLOR), ephemeral=True)
         return
     await interaction.response.defer(thinking=True, ephemeral=True)
-
+    
     cache_dosya_yolu = os.path.join(ANALYSIS_CACHE_KLASORU, f"{interaction.channel.id}.json")
     cache_data = {"messages": {}}
-
+    
     manuel_kanali = client.get_channel(MANUEL_ONAY_KANAL_ID)
     if not manuel_kanali:
         await interaction.followup.send(embed=discord.Embed(title="❌ Kurulum Hatası", description="Manuel onay kanalı bulunamadı.", color=ERROR_COLOR), ephemeral=True)
         return
-
+        
     await interaction.followup.send(embed=discord.Embed(title="🐙 Hafıza Çekirdekleri Aktif!", description=f"`{interaction.channel.name}` konusundaki resimler taranıyor...", color=INFO_COLOR), ephemeral=True)
-
+    
     toplam_otomatik_onay, toplam_manuel_ret = 0, 0
     async for message in interaction.channel.history(limit=200, oldest_first=True):
         if message.author.bot or not message.attachments: continue
-
+        
         await message.clear_reactions()
         cache_data["messages"][str(message.id)] = {"attachments": {}}
-
+        
         for attachment in message.attachments:
             if not (attachment.content_type and attachment.content_type.startswith('image/')): continue
             try:
                 image_data = await attachment.read()
                 result = await analyze_image_with_ai(image_data)
-
+                
                 oyuncu_adi = result.get("player_name", message.author.display_name)
                 set_adi = result.get("matched_set")
                 attachment_cache = {"player": oyuncu_adi, "set": set_adi}
@@ -311,7 +319,7 @@ async def analiz_et(interaction: discord.Interaction):
                     reason_title, reason_desc, embed_color = "🧐 Ahtapotun Gözünden Kaçan Bir Detay", "AI, seti referans setlerle eşleştiremedi.", WARN_COLOR
                     if result.get("error"): reason_title, reason_desc = "❗ AI Analiz Hatası", f"`{result.get('error')}`"
                     elif result.get("item_power", 0) < MINIMUM_IP: reason_title, reason_desc, embed_color = "⛔ Regear Reddedildi", f"Düşük IP: `{result.get('item_power', 0)}` (Min: `{MINIMUM_IP}`)", ERROR_COLOR
-
+                    
                     manual_embed = discord.Embed(title=f"{reason_title}", color=embed_color, timestamp=datetime.now())
                     manual_embed.add_field(name="Oyuncu", value=f"`{oyuncu_adi}`", inline=True).add_field(name="Talebi Yapan", value=message.author.mention, inline=True)
                     manual_embed.add_field(name="Kaynak Konu", value=f"[{interaction.channel.name}]({interaction.channel.jump_url})", inline=False).add_field(name="Sebep", value=reason_desc, inline=False)
@@ -325,16 +333,16 @@ async def analiz_et(interaction: discord.Interaction):
                 print(f"Analiz döngüsünde hata (Mesaj ID: {message.id}): {e}")
                 try: await message.add_reaction('⚠️')
                 except: pass
-
+        
         veri_kaydet(cache_dosya_yolu, cache_data)
         await update_message_reactions(interaction.channel.id, message.id)
-
+        
     final_cache = veri_yukle(cache_dosya_yolu)
     for msg_data in final_cache.get("messages", {}).values():
         for attach_data in msg_data.get("attachments", {}).values():
             if attach_data.get("status") == "approved_auto": toplam_otomatik_onay += 1
             elif attach_data.get("status") == "pending_manual": toplam_manuel_ret += 1
-
+            
     summary_embed = discord.Embed(title="📜 Analiz Raporu Hazır", description=f"`{interaction.channel.name}` konusundaki tarama tamamlandı ve sonuçlar hafızaya kaydedildi.", color=INFO_COLOR)
     summary_embed.add_field(name="✅ Otomatik Onaylanan", value=f"**{toplam_otomatik_onay}** adet", inline=True)
     summary_embed.add_field(name="❓ Manuel Onay Bekleyen", value=f"**{toplam_manuel_ret}** adet", inline=True)
@@ -348,7 +356,7 @@ async def liste_olustur(interaction: discord.Interaction):
         await interaction.response.send_message("Bu komut sadece bir konu (thread) içinde kullanılabilir.", ephemeral=True)
         return
     await interaction.response.defer(thinking=True, ephemeral=True)
-
+    
     cache_dosya_yolu = os.path.join(ANALYSIS_CACHE_KLASORU, f"{interaction.channel.id}.json")
     if not os.path.exists(cache_dosya_yolu):
         await interaction.followup.send(embed=discord.Embed(title="⚠️ Hafıza Bulunamadı", description="Bu konu için başlatılmış bir analiz oturumu bulunamadı. Lütfen önce `/analiz-et` komutunu çalıştırın.", color=WARN_COLOR), ephemeral=True)
@@ -368,7 +376,7 @@ async def liste_olustur(interaction: discord.Interaction):
     if not onaylananlar_listesi:
         await interaction.followup.send(embed=discord.Embed(title="ℹ️ Bilgi", description="Hafızada listelenecek onaylanmış bir talep bulunamadı.", color=INFO_COLOR), ephemeral=True)
         return
-
+    
     final_list = sorted(list(onaylananlar_listesi.values()))
     file_content = "\n".join(final_list)
     buffer = io.BytesIO(file_content.encode('utf-8'))
@@ -377,16 +385,16 @@ async def liste_olustur(interaction: discord.Interaction):
 
     embed=discord.Embed(title="✒️ Onay Listesi Mürekkeple Damgalandı!", description=f"`{interaction.channel.name}` konusu için **{len(final_list)}** onaylanmış talep bulundu.", color=SUCCESS_COLOR)
     await interaction.channel.send(content=f"Hey {interaction.user.mention}!", embed=embed, file=file)
-
+    
     try:
         buffer.seek(0)
         dm_file = discord.File(buffer, filename=f"onay_listesi_{interaction.channel.name.replace(' ', '_')}_{timestamp}.txt")
         await interaction.user.send(f"`{interaction.channel.name}` konusu için oluşturulan onay listesi:", file=dm_file)
     except discord.Forbidden:
         await interaction.followup.send("Sana özel mesaj gönderemedim, DM'lerin kapalı olabilir.", ephemeral=True)
-
+    
     await interaction.followup.send("Liste başarıyla oluşturuldu ve analiz hafızası temizlendi.", ephemeral=True)
-
+    
     try:
         os.remove(cache_dosya_yolu)
         print(f"Hafıza dosyası ({cache_dosya_yolu}) başarıyla silindi.")
