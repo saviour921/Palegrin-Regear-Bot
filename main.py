@@ -56,7 +56,7 @@ try:
         print("UYARI: GEMINI_API_KEY bulunamadı.")
     else:
         genai.configure(api_key=api_key)
-        vision_model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        vision_model = genai.GenerativeModel('gemini-1.5-flash-latest')
         print("Gemini API başarıyla yapılandırıldı.")
 except Exception as e:
     vision_model = None
