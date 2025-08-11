@@ -71,11 +71,12 @@ async def analyze_image_with_ai(death_image_data):
         prompt = f"""
         Sen uzman bir Albion Online analistisin. Görevin, bir oyuncunun ölüm raporu ekran görüntüsünü (Ölüm Raporu) inceleyip, ekipmanını sana verilen referans setlerle (Referans Setler) karşılaştırmaktır.
 
-        **KESİN KURAL: 1 PARÇA FARK TOLERANSI**
-        Bir oyuncunun seti, 6 ana ekipman parçasından (Kafa, Zırh, Ana El, Yan El, Ayakkabı, Pelerin) **en az 5 tanesi** referans setlerden HERHANGİ BİRİ ile eşleşiyorsa ONAYLANIR.
+        **KESİN KURAL: 2 PARÇA FARK TOLERANSI**
+        Bir oyuncunun seti, 6 ana ekipman parçasından (Kafa, Zırh, Ana El, Yan El, Ayakkabı, Pelerin) **en az 4 tanesi** referans setlerden HERHANGİ BİRİ ile eşleşiyorsa ONAYLANIR.
         - 6/6 eşleşme = ONAYLA
         - 5/6 eşleşme = ONAYLA
-        - 4/6 veya daha az eşleşme = REDDET
+        - 4/6 eşleşme = ONAYLA
+        - 3/6 veya daha az eşleşme = REDDET
 
         **ANALİZ ADIMLARI VE ÇIKTI FORMATI:**
         Cevabını iki bölüm halinde ver.
