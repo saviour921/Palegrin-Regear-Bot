@@ -71,12 +71,11 @@ async def analyze_image_with_ai(death_image_data):
         prompt = f"""
         Sen uzman bir Albion Online analistisin. Görevin, bir oyuncunun ölüm raporu ekran görüntüsünü (Ölüm Raporu) inceleyip, ekipmanını sana verilen referans setlerle (Referans Setler) karşılaştırmaktır.
 
-        **KESİN KURAL: 2 PARÇA FARK TOLERANSI**
-        Bir oyuncunun seti, 6 ana ekipman parçasından (Kafa, Zırh, Ana El, Yan El, Ayakkabı, Pelerin) **en az 4 tanesi** referans setlerden HERHANGİ BİRİ ile eşleşiyorsa ONAYLANIR.
+        **KESİN KURAL: 1 PARÇA FARK TOLERANSI**
+        Bir oyuncunun seti, 6 ana ekipman parçasından (Kafa, Zırh, Ana El, Yan El, Ayakkabı, Pelerin) **en az 5 tanesi** referans setlerden HERHANGİ BİRİ ile eşleşiyorsa ONAYLANIR.
         - 6/6 eşleşme = ONAYLA
         - 5/6 eşleşme = ONAYLA
-        - 4/6 eşleşme = ONAYLA
-        - 3/6 veya daha az eşleşme = REDDET
+        - 4/6 veya daha az eşleşme = REDDET
 
         **ANALİZ ADIMLARI VE ÇIKTI FORMATI:**
         Cevabını iki bölüm halinde ver.
@@ -85,7 +84,7 @@ async def analyze_image_with_ai(death_image_data):
         Bu bölümde, kararını nasıl verdiğini adım adım açıkla.
         1. Oyuncunun adını ve IP'sini yaz.
         2. Oyuncunun giydiği 6 ana parçayı listele.
-        3. Her bir referans set ile kaç parça eşleştiğini yaz (Örn: "deftank seti ile 4/6 eşleşti.").
+        3. Her bir referans set ile kaç parça eşleştiğini yaz (Örn: "deftank seti ile 5/6 eşleşti.").
         4. Nihai kararını (Onaylandı/Reddedildi) bu sayıma göre belirt.
 
         Bölüm 2: JSON Çıktısı (Zorunlu)
@@ -134,7 +133,6 @@ async def analyze_image_with_ai(death_image_data):
 
     except Exception as e: 
         return {"error": f"AI analizi sırasında kritik bir hata oluştu: {e}"}
-
 async def update_message_reactions(thread_id: int, message_id: int):
     cache_dosya_yolu = os.path.join(ANALYSIS_CACHE_KLASORU, f"{thread_id}.json")
     if not os.path.exists(cache_dosya_yolu): return
@@ -181,7 +179,7 @@ class SetSelectView(ui.View):
         select.disabled = True
         await interaction.message.edit(embed=new_embed, view=self)
         await update_message_reactions(self.original_channel_id, self.original_message_id)
-        await interaction.followup.send(f"Talep `{seçilen_set}` olarak onaylandı ve hafızaya kaydedildi.", ephemeral=True)
+        await interaction.followup.send(f"Talep `{seçilen_set}` olarak onaylandı, hafızaya kaydedildi ve orijinal mesaj reaksiyonları güncellendi.", ephemeral=True)
 class ManualReviewView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -190,6 +188,7 @@ class ManualReviewView(ui.View):
             await interaction.response.send_message(f"Bu butonları sadece `{YONETICI_IZNI}` iznine sahip olanlar kullanabilir.", ephemeral=True)
             return False
         return True
+    
     @ui.button(label="✅ Onayla", style=discord.ButtonStyle.success, custom_id="manual_approve_start")
     async def approve_button(self, interaction: discord.Interaction, button: ui.Button):
         if not await self.check_permission(interaction): return
@@ -200,6 +199,7 @@ class ManualReviewView(ui.View):
             await interaction.response.edit_message(view=select_view)
         except (IndexError, ValueError, KeyError):
              await interaction.response.send_message("Hata: Gerekli ID'ler okunamadı.", ephemeral=True)
+    
     @ui.button(label="❌ Reddet", style=discord.ButtonStyle.danger, custom_id="manual_reject")
     async def reject_button(self, interaction: discord.Interaction, button: ui.Button):
         if not await self.check_permission(interaction): return
