@@ -20,10 +20,10 @@ AI_ONAY_METNI = "SET ONAYLANDI"
 AI_RED_METNI = "SET HATALI"
 
 # Renkler ve Setler
-SUCCESS_COLOR = discord.Color.from_rgb(46, 204, 113) # Yeşil
-ERROR_COLOR = discord.Color.from_rgb(231, 76, 60) # Kırmızı
-WARN_COLOR = discord.Color.from_rgb(241, 196, 15) # Sarı
-INFO_COLOR = discord.Color.from_rgb(52, 152, 219) # Mavi
+SUCCESS_COLOR = discord.Color.from_rgb(46, 204, 113)
+ERROR_COLOR = discord.Color.from_rgb(231, 76, 60)
+WARN_COLOR = discord.Color.from_rgb(241, 196, 15)
+INFO_COLOR = discord.Color.from_rgb(52, 152, 219)
 MUTED_COLOR = discord.Color.dark_grey()
 MANUEL_ONAY_SETLERI = ["deftank", "support", "healer", "sc-rootbound-lifecurse", "dps"]
 
@@ -57,7 +57,7 @@ try:
         print("UYARI: GEMINI_API_KEY bulunamadı.")
     else:
         genai.configure(api_key=api_key)
-        vision_model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        vision_model = genai.GenerativeModel('gemini-1.5-pro-latest') # Pro modelini kullanıyoruz
         print("Gemini API başarıyla yapılandırıldı.")
 except Exception as e:
     vision_model = None
@@ -69,28 +69,26 @@ async def analyze_image_with_ai(death_image_data):
     if not vision_model or not onayli_setler: return {"error": "AI modeli veya referans setleri yüklü değil."}
     try:
         prompt = f"""
-        Sen uzman bir Albion Online analistisin. Görevin, bir oyuncunun ölüm raporu ekran görüntüsünü (Ölüm Raporu) inceleyip, ekipmanını sana verilen referans setlerle (Referans Setler) karşılaştırmaktır.
-        **KESİN KURAL: 2 PARÇA FARK TOLERANSI**
-        Bir oyuncunun seti, 6 ana ekipman parçasından (Kafa, Zırh, Ana El, Yan El, Ayakkabı, Pelerin) **en az 4 tanesi** referans setlerden HERHANGİ BİRİ ile eşleşiyorsa ONAYLANIR.
-        - 6/6 eşleşme = ONAYLA
-        - 5/6 eşleşme = ONAYLA
-        - 4/6 eşleşme = ONAYLA
-        - 3/6 veya daha az eşleşme = REDDET
-        **ANALİZ ADIMLARI VE ÇIKTI FORMATI:**
-        Cevabını iki bölüm halinde ver.
-        Bölüm 1: Düşünce Süreci (Zorunlu)
-        Bu bölümde, kararını nasıl verdiğini adım adım açıkla.
-        1. Oyuncunun adını ve IP'sini yaz.
-        2. Oyuncunun giydiği 6 ana parçayı listele.
-        3. Her bir referans set ile kaç parça eşleştiğini yaz (Örn: "deftank seti ile 4/6 eşleşti.").
-        4. Nihai kararını (Onaylandı/Reddedildi) bu sayıma göre belirt.
-        Bölüm 2: JSON Çıktısı (Zorunlu)
-        Düşünce sürecine dayanarak, aşağıdaki JSON formatında nihai çıktıyı ver. Bu bölümün başına veya sonuna ```json bloğu koyma. Sadece saf JSON ver.
-        - Onay durumunda: `status` alanına '{AI_ONAY_METNI}' yaz ve `matched_set` alanına en çok benzeyen setin adını yaz.
-        - Ret durumunda: `status` alanına '{AI_RED_METNI}' yaz.
+        Sen dikkatli ve metodik bir Albion Online veri analistisin. Görevin, bir ölüm raporu ekran görüntüsünden belirli bilgileri çıkarmak ve ardından bir kurala göre ekipman analizi yapmaktır.
+
+        **ADIM 1: VERİ ÇIKARMA (ZORUNLU)**
+        Öncelikle, resimden aşağıdaki bilgileri dikkatlice bul ve çıkar:
+        - `player_name`: Ölen oyuncunun adı. Genellikle solda ve büyük yazılır.
+        - `item_power`: Oyuncunun "Average Item Power" değeri. Bu bir sayıdır. **Eğer bu sayıyı resimde kesinlikle bulamıyorsan, bu alana `0` yaz.**
+
+        **ADIM 2: EKİPMAN ANALİZİ**
+        Şimdi, çıkardığın bilgilere dayanarak ekipman analizini yap.
+        - **KESİN KURAL: 2 PARÇA FARK TOLERANSI**
+          - Oyuncunun 6 ana ekipmanını (Kafa, Zırh, Ayakkabı, Ana El, Yan El, Pelerin) referans setlerle karşılaştır.
+          - Eğer eşleşen parça sayısı **4, 5, veya 6** ise, sonuç ONAYDIR (`{AI_ONAY_METNI}`).
+          - Eğer eşleşen parça sayısı **3 veya daha az** ise, sonuç RETTİR (`{AI_RED_METNI}`).
+
+        **ADIM 3: ÇIKTI OLUŞTURMA**
+        Tüm analizini, başka hiçbir metin olmadan, SADECE aşağıdaki JSON formatında ver. `item_power` olarak Adım 1'de bulduğun sayıyı kullan.
+
         {{
           "player_name": "OyuncununAdı",
-          "item_power": 1350,
+          "item_power": 1473,
           "status": "{AI_ONAY_METNI} veya {AI_RED_METNI}",
           "matched_set": "Eşleşen Setin Adı veya null"
         }}
@@ -107,11 +105,12 @@ async def analyze_image_with_ai(death_image_data):
             except FileNotFoundError:
                 print(f"UYARI: {dosya_yolu} adlı referans resim dosyası bulunamadı.")
                 continue
+        
         ai_response = await vision_model.generate_content_async(content_list)
         response_text = ai_response.text
-        print("--- AI Düşünce Süreci ---")
-        print(response_text)
-        print("--------------------------")
+        
+        print(f"AI Ham Cevabı: {response_text}")
+
         try:
             json_start_index = response_text.find('{')
             json_end_index = response_text.rfind('}') + 1
@@ -123,6 +122,7 @@ async def analyze_image_with_ai(death_image_data):
         except Exception as json_e:
             print(f"JSON parse hatası: {json_e}")
             return {"error": "AI yanıtı işlenirken bir hata oluştu."}
+
     except Exception as e: 
         return {"error": f"AI analizi sırasında kritik bir hata oluştu: {e}"}
 
