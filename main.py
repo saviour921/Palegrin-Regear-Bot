@@ -56,7 +56,7 @@ try:
         print("UYARI: GEMINI_API_KEY bulunamadı.")
     else:
         genai.configure(api_key=api_key)
-        vision_model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        vision_model = genai.GenerativeModel('gemini-1.5-flash-latest')
         print("Gemini API başarıyla yapılandırıldı.")
 except Exception as e:
     vision_model = None
@@ -121,8 +121,10 @@ async def analyze_image_with_ai(death_image_data):
         except Exception as json_e:
             print(f"JSON parse hatası: {json_e}")
             return {"error": "AI yanıtı işlenirken bir hata oluştu."}
+
     except Exception as e: 
         return {"error": f"AI analizi sırasında kritik bir hata oluştu: {e}"}
+
 async def update_message_reactions(thread_id: int, message_id: int):
     cache_dosya_yolu = os.path.join(ANALYSIS_CACHE_KLASORU, f"{thread_id}.json")
     if not os.path.exists(cache_dosya_yolu): return
@@ -175,6 +177,7 @@ class ManualReviewView(ui.View):
             await interaction.response.send_message(f"Bu butonları sadece `{YONETICI_IZNI}` iznine sahip olanlar kullanabilir.", ephemeral=True)
             return False
         return True
+    
     @ui.button(label="✅ Onayla", style=discord.ButtonStyle.success, custom_id="manual_approve_start")
     async def approve_button(self, interaction: discord.Interaction, button: ui.Button):
         if not await self.check_permission(interaction): return
@@ -185,6 +188,7 @@ class ManualReviewView(ui.View):
             await interaction.response.edit_message(view=select_view)
         except (IndexError, ValueError, KeyError):
              await interaction.response.send_message("Hata: Gerekli ID'ler okunamadı.", ephemeral=True)
+    
     @ui.button(label="❌ Reddet", style=discord.ButtonStyle.danger, custom_id="manual_reject")
     async def reject_button(self, interaction: discord.Interaction, button: ui.Button):
         if not await self.check_permission(interaction): return
