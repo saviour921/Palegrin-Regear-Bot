@@ -15,14 +15,15 @@ YONETICI_IZNI = 'manage_guild'
 ONAYLI_SETLER_DOSYASI = "/data/onayli_setler_data.json"
 SET_IMAGES_KLASORU = "/data/set_images"
 ANALYSIS_CACHE_KLASORU = "/data/analysis_cache"
+
 AI_ONAY_METNI = "SET ONAYLANDI"
 AI_RED_METNI = "SET HATALI"
 
 # Renkler ve Setler
-SUCCESS_COLOR = discord.Color.from_rgb(46, 204, 113)
-ERROR_COLOR = discord.Color.from_rgb(231, 76, 60)
-WARN_COLOR = discord.Color.from_rgb(241, 196, 15)
-INFO_COLOR = discord.Color.from_rgb(52, 152, 219)
+SUCCESS_COLOR = discord.Color.from_rgb(46, 204, 113) # Yeşil
+ERROR_COLOR = discord.Color.from_rgb(231, 76, 60) # Kırmızı
+WARN_COLOR = discord.Color.from_rgb(241, 196, 15) # Sarı
+INFO_COLOR = discord.Color.from_rgb(52, 152, 219) # Mavi
 MUTED_COLOR = discord.Color.dark_grey()
 MANUEL_ONAY_SETLERI = ["deftank", "support", "healer", "sc-rootbound-lifecurse", "dps"]
 
@@ -56,7 +57,7 @@ try:
         print("UYARI: GEMINI_API_KEY bulunamadı.")
     else:
         genai.configure(api_key=api_key)
-        vision_model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        vision_model = genai.GenerativeModel('gemini-1.5-pro-latest')
         print("Gemini API başarıyla yapılandırıldı.")
 except Exception as e:
     vision_model = None
@@ -68,7 +69,7 @@ async def analyze_image_with_ai(death_image_data):
     if not vision_model or not onayli_setler: return {"error": "AI modeli veya referans setleri yüklü değil."}
     try:
         prompt = f"""
-        Sen dikkatli ve metodik bir Albion Online veri analistisin. Görevin, bir ölüm raporu ekran görüntüsünden belirli bilgileri çıkarmak ve ardından bir kurala göre ekipman analizi yapmaktır.
+        Sen dikkatli ve metodik bir Albion Online veri analistisin. Resimlerin kalitesi düşük veya itemler belirsiz olabilir, yine de en iyi tahminini yapmalısın.
 
         **ADIM 1: VERİ ÇIKARMA (ZORUNLU)**
         Öncelikle, resimden aşağıdaki bilgileri dikkatlice bul ve çıkar:
@@ -81,9 +82,10 @@ async def analyze_image_with_ai(death_image_data):
           - Oyuncunun 6 ana ekipmanını (Kafa, Zırh, Ayakkabı, Ana El, Yan El, Pelerin) referans setlerle karşılaştır.
           - Eğer eşleşen parça sayısı **4, 5, veya 6** ise, sonuç ONAYDIR (`{AI_ONAY_METNI}`).
           - Eğer eşleşen parça sayısı **3 veya daha az** ise, sonuç RETTİR (`{AI_RED_METNI}`).
+        - Kozmetik farkları (seviye, kalite vb.) görmezden gel.
 
         **ADIM 3: ÇIKTI OLUŞTURMA**
-        Tüm analizini, başka hiçbir metin veya açıklama olmadan, SADECE aşağıdaki JSON formatında ver. `item_power` olarak Adım 1'de bulduğun sayıyı kullan.
+        Tüm analizini, başka hiçbir metin veya açıklama olmadan, SADECE aşağıdaki JSON formatında ver.
 
         {{
           "player_name": "OyuncununAdı",
