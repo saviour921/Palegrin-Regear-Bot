@@ -15,7 +15,6 @@ YONETICI_IZNI = 'manage_guild'
 ONAYLI_SETLER_DOSYASI = "/data/onayli_setler_data.json"
 SET_IMAGES_KLASORU = "/data/set_images"
 ANALYSIS_CACHE_KLASORU = "/data/analysis_cache"
-
 AI_ONAY_METNI = "SET ONAYLANDI"
 AI_RED_METNI = "SET HATALI"
 
@@ -71,11 +70,12 @@ async def analyze_image_with_ai(death_image_data):
         prompt = f"""
         Sen uzman bir Albion Online analistisin. Görevin, bir oyuncunun ölüm raporu ekran görüntüsünü (Ölüm Raporu) inceleyip, ekipmanını sana verilen referans setlerle (Referans Setler) karşılaştırmaktır.
 
-        **KESİN KURAL: 1 PARÇA FARK TOLERANSI**
-        Bir oyuncunun seti, 6 ana ekipman parçasından (Kafa, Zırh, Ana El, Yan El, Ayakkabı, Pelerin) **en az 5 tanesi** referans setlerden HERHANGİ BİRİ ile eşleşiyorsa ONAYLANIR.
+        **KESİN KURAL: 2 PARÇA FARK TOLERANSI**
+        Bir oyuncunun seti, 6 ana ekipman parçasından (Kafa, Zırh, Ana El, Yan El, Ayakkabı, Pelerin) **en az 4 tanesi** referans setlerden HERHANGİ BİRİ ile eşleşiyorsa ONAYLANIR.
         - 6/6 eşleşme = ONAYLA
         - 5/6 eşleşme = ONAYLA
-        - 4/6 veya daha az eşleşme = REDDET
+        - 4/6 eşleşme = ONAYLA
+        - 3/6 veya daha az eşleşme = REDDET
 
         **ANALİZ ADIMLARI VE ÇIKTI FORMATI:**
         Cevabını iki bölüm halinde ver.
@@ -84,7 +84,7 @@ async def analyze_image_with_ai(death_image_data):
         Bu bölümde, kararını nasıl verdiğini adım adım açıkla.
         1. Oyuncunun adını ve IP'sini yaz.
         2. Oyuncunun giydiği 6 ana parçayı listele.
-        3. Her bir referans set ile kaç parça eşleştiğini yaz (Örn: "deftank seti ile 5/6 eşleşti.").
+        3. Her bir referans set ile kaç parça eşleştiğini yaz (Örn: "deftank seti ile 4/6 eşleşti.").
         4. Nihai kararını (Onaylandı/Reddedildi) bu sayıma göre belirt.
 
         Bölüm 2: JSON Çıktısı (Zorunlu)
@@ -133,6 +133,7 @@ async def analyze_image_with_ai(death_image_data):
 
     except Exception as e: 
         return {"error": f"AI analizi sırasında kritik bir hata oluştu: {e}"}
+
 async def update_message_reactions(thread_id: int, message_id: int):
     cache_dosya_yolu = os.path.join(ANALYSIS_CACHE_KLASORU, f"{thread_id}.json")
     if not os.path.exists(cache_dosya_yolu): return
@@ -141,10 +142,8 @@ async def update_message_reactions(thread_id: int, message_id: int):
     if not message_data: return
     approved_count, pending_or_rejected_count = 0, 0
     for attachment_id, attachment_data in message_data.get("attachments", {}).items():
-        if "approved" in attachment_data.get("status", ""):
-            approved_count += 1
-        else:
-            pending_or_rejected_count += 1
+        if "approved" in attachment_data.get("status", ""): approved_count += 1
+        else: pending_or_rejected_count += 1
     try:
         thread_channel = client.get_channel(thread_id)
         if thread_channel:
@@ -152,8 +151,7 @@ async def update_message_reactions(thread_id: int, message_id: int):
             await message.clear_reactions()
             if approved_count > 0: await message.add_reaction('✅')
             if pending_or_rejected_count > 0: await message.add_reaction('❌')
-    except Exception as e:
-        print(f"Reaksiyon güncellenirken hata oluştu: {e}")
+    except Exception as e: print(f"Reaksiyon güncellenirken hata oluştu: {e}")
 
 # --- TÜM İNTERAKTİF ARAYÜZ SINIFLARI ---
 class SetSelectView(ui.View):
@@ -179,7 +177,7 @@ class SetSelectView(ui.View):
         select.disabled = True
         await interaction.message.edit(embed=new_embed, view=self)
         await update_message_reactions(self.original_channel_id, self.original_message_id)
-        await interaction.followup.send(f"Talep `{seçilen_set}` olarak onaylandı, hafızaya kaydedildi ve orijinal mesaj reaksiyonları güncellendi.", ephemeral=True)
+        await interaction.followup.send(f"Talep `{seçilen_set}` olarak onaylandı ve hafızaya kaydedildi.", ephemeral=True)
 class ManualReviewView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -268,7 +266,7 @@ async def on_ready():
 async def yardim(interaction: discord.Interaction):
     embed = discord.Embed(title="🐙 Palegrin Regear Asistanı Yardım Menüsü", description="Merhaba! Ben Palegrin Guild'inin regear sürecini otomatize etmek ve yönetmek için buradayım.", color=INFO_COLOR)
     embed.set_thumbnail(url=client.user.avatar.url if client.user.avatar else None)
-    embed.add_field(name="📝 Yeni Regear İş Akışı", value="1. **Analiz Başlat:** Bir yönetici, regear taleplerinin olduğu konuya `/analiz-et` komutunu yazar. Bu, o konu için özel bir **analiz oturumu (hafıza)** başlatır.\n2. **Otomatik Değerlendirme:** Bot, tüm resimleri tarar ve sonuçları hafızaya kaydeder. İlk değerlendirmeye göre mesajlara ✅/❌ tepkilerini koyar. Manuel onay gerekenler, ilgili kanala butonlarla raporlanır.\n3. **Manuel Onay:** Yöneticiler, `#manuel-onay` kanalındaki talepleri butonları kullanarak yönetir. Verilen her karar, hafızaya anında işlenir ve orijinal mesajdaki tepkiler **dinamik olarak güncellenir.**\n4. **Listeleme ve Oturumu Kapatma:** Süreç bittiğinde, yönetici `/liste-olustur` komutuyla hafızadaki tüm onaylanmış taleplerin nihai listesini alır. Liste gönderildikten sonra **o oturumun hafızası temizlenir** ve süreç tamamlanır.", inline=False)
+    embed.add_field(name="📝 Yeni Regear İş Akışı", value="1. **Analiz Başlat:** Bir yönetici, regear taleplerinin olduğu konuya `/analiz-et` komutunu yazar. Bu, o konu için özel bir **analiz oturumu (hafıza)** başlatır.\n2. **Otomatik Değerlendirme:** Bot, tüm resimleri tarar ve sonuçları hafızaya kaydeder. İlk değerlendirmeye göre mesajlara ✅/❌ tepkilerini koyar. Manuel onay gerekenler, ilgili kanala butonlarla raporlanır.\n3. **Manuel Onay:** Yöneticiler, `#manuel-onay` kanalındaki talepleri butonları kullanarak yönetir. Verilen her karar, hafızaya anında işlenir ve orijinal mesajdaki tepkiler **dinamik olarak güncellenir.**\n4. **Listeleme ve Oturumu Kapatma:** Süreç bittiğinde, yönetici `/liste-olustur` ile nihai ödeme listesini alır. Liste gönderildikten sonra **o oturumun hafızası temizlenir** ve süreç tamamlanır.", inline=False)
     embed.add_field(name="🛠️ Yönetici Komutları", value="`/analiz-et`: Bir analiz oturumu başlatır.\n`/liste-olustur`: Mevcut oturumdaki onaylanmış talepleri listeler.\n`/set-resmi-ekle`: Yeni bir referans set ekler.\n`/set-sil`: Bir referans setini siler.\n`/setleri-goster`: Kayıtlı tüm setleri interaktif olarak gösterir.", inline=False)
     embed.set_footer(text="Palegrin Guild'i için özel olarak geliştirildi.")
     await interaction.response.send_message(embed=embed, ephemeral=True)
