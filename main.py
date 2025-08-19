@@ -342,8 +342,7 @@ async def analiz_et(interaction: discord.Interaction):
                 image_data = await attachment.read()
                 result = await analyze_image_with_ai(image_data)
                 
-                # --- AI sonucu işleme (GÜNCEL) ---
-discord_adi = message.author.name  # Sunucudaki görünen Discord adı
+                discord_adi = message.author.name  # Sunucudaki görünen Discord adı
 
 extracted_name = (result.get("player_name") or "").strip()
 oyuncu_adi = extracted_name if extracted_name else "isim okunamadı"
