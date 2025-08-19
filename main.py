@@ -47,7 +47,7 @@ def veri_kaydet(dosya_adi, veri):
 
 # ----- BOTUN İZİNLERİ VE BAŞLATMA -----
 intents = discord.Intents.default()
-intents.members = True  # Sunucu üyelerini çekmek için intent
+intents.members = True  # Sunucudaki görünen ad (nickname) için gerekli
 client = MyClient(intents=intents)
 
 # ----- GEMINI API AYARLARI -----
@@ -349,8 +349,18 @@ async def analiz_et(interaction: discord.Interaction):
                 
                 ip = result.get("item_power") or 0
                 
-                member = message.guild.get_member(message.author.id) if getattr(message, "guild", None) else None
-                discord_display = getattr(member, "display_name", getattr(message.author, "display_name", message.author.name))
+                member = None
+                if getattr(message, "guild", None):
+                    member = message.guild.get_member(message.author.id)
+                    if member is None:
+                        try:
+                            member = await message.guild.fetch_member(message.author.id)
+                        except Exception:
+                            member = None
+                if isinstance(member, discord.Member):
+                    discord_display = member.display_name
+                else:
+                    discord_display = getattr(message.author, "global_name", None) or message.author.name
                 attachment_cache = {"player": oyuncu_adi, "set": set_adi, "ip": ip, "discord": discord_display, "author_id": message.author.id}
 
                 if not result.get("error") and ip >= MINIMUM_IP and result.get("status") == AI_ONAY_METNI:
@@ -415,18 +425,16 @@ async def liste_olustur(interaction: discord.Interaction):
         for attach_id, attach_data in msg_data.get("attachments", {}).items():
             status = attach_data.get("status", "")
             if "approved" in status:
-                        author_id = attach_data.get("author_id")
-        discord_name = attach_data.get("discord") or "Bilinmiyor"
-
-        if author_id:
-            try:
-                member = interaction.guild.get_member(int(author_id)) or await interaction.guild.fetch_member(int(author_id))
-                if isinstance(member, discord.Member):
-                    discord_name = member.display_name
-            except Exception:
-                pass
-
-        set_name = attach_data.get("set") or "set tespit edilemedi"
+                author_id = attach_data.get("author_id")
+                discord_name = attach_data.get("discord") or "Bilinmiyor"
+                if author_id:
+                    try:
+                        member = interaction.guild.get_member(int(author_id)) or await interaction.guild.fetch_member(int(author_id))
+                        if isinstance(member, discord.Member):
+                            discord_name = member.display_name
+                    except Exception:
+                        pass
+                set_name = attach_data.get("set") or "set tespit edilemedi"
                 if status == "approved_manual":
                     manuel.append(f"{discord_name} - {set_name} - manuel olarak onaylanmıştır")
                 else:
