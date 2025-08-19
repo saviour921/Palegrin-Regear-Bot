@@ -415,18 +415,18 @@ async def liste_olustur(interaction: discord.Interaction):
         for attach_id, attach_data in msg_data.get("attachments", {}).items():
             status = attach_data.get("status", "")
             if "approved" in status:
-                author_id = attach_data.get("author_id")
-discord_name = attach_data.get("discord") or "Bilinmiyor"
+                        author_id = attach_data.get("author_id")
+        discord_name = attach_data.get("discord") or "Bilinmiyor"
 
-if author_id:
-    try:
-        member = interaction.guild.get_member(int(author_id)) or await interaction.guild.fetch_member(int(author_id))
-        if isinstance(member, discord.Member):
-            discord_name = member.display_name
-    except Exception:
-        pass
+        if author_id:
+            try:
+                member = interaction.guild.get_member(int(author_id)) or await interaction.guild.fetch_member(int(author_id))
+                if isinstance(member, discord.Member):
+                    discord_name = member.display_name
+            except Exception:
+                pass
 
-set_name = attach_data.get("set") or "set tespit edilemedi"
+        set_name = attach_data.get("set") or "set tespit edilemedi"
                 if status == "approved_manual":
                     manuel.append(f"{discord_name} - {set_name} - manuel olarak onaylanmıştır")
                 else:
