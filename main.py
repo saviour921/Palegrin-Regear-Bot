@@ -348,7 +348,9 @@ async def analiz_et(interaction: discord.Interaction):
                 
                 ip = result.get("item_power") or 0
                 
-                attachment_cache = {"player": oyuncu_adi, "set": set_adi, "ip": ip, "discord": message.author.display_name}
+                member = message.guild.get_member(message.author.id) if getattr(message, "guild", None) else None
+                discord_display = getattr(member, "display_name", getattr(message.author, "display_name", message.author.name))
+                attachment_cache = {"player": oyuncu_adi, "set": set_adi, "ip": ip, "discord": discord_display}
 
                 if not result.get("error") and ip >= MINIMUM_IP and result.get("status") == AI_ONAY_METNI:
                     attachment_cache["status"] = "approved_auto"
@@ -405,7 +407,7 @@ async def liste_olustur(interaction: discord.Interaction):
         return
 
     cache_data = veri_yukle(cache_dosya_yolu)
-        otomatik = []
+    otomatik = []
     manuel = []
 
     for msg_id, msg_data in cache_data.get("messages", {}).items():
@@ -436,12 +438,11 @@ async def liste_olustur(interaction: discord.Interaction):
             lines.append(f"{i}. {entry}")
 
     file_content = "\n".join(lines)
-file_content = "\n".join(final_list)
     buffer = io.BytesIO(file_content.encode('utf-8'))
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
     file = discord.File(buffer, filename=f"onay_listesi_{interaction.channel.name.replace(' ', '_')}_{timestamp}.txt")
 
-    embed=discord.Embed(title="✒️ Onay Listesi Mürekkeple Damgalandı!", description=f"`{interaction.channel.name}` konusu için **{len(final_list)}** onaylanmış talep bulundu.", color=SUCCESS_COLOR)
+    embed=discord.Embed(title="✒️ Onay Listesi Mürekkeple Damgalandı!", description=f"`{interaction.channel.name}` konusu için **{len(otomatik) + len(manuel)}** onaylanmış talep bulundu.", color=SUCCESS_COLOR)
     await interaction.channel.send(content=f"Hey {interaction.user.mention}!", embed=embed, file=file)
     
     try:
