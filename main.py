@@ -1,5 +1,6 @@
 # Gerekli kütüphaneleri içe aktarma
 import discord
+from discord import AllowedMentions
 from discord import app_commands, ui
 import os
 import json
@@ -491,7 +492,10 @@ async def regear_duyuru(interaction: discord.Interaction):
         "🌐 https://palegrin-balance.web.app \n"
         "||@everyone||"
     )
-    await interaction.response.send_message(message)
+    await interaction.response.send_message(
+        message,
+        allowed_mentions=AllowedMentions(everyone=True)
+    )
 
 
 # ----- BOTU ÇALIŞTIRMA -----
