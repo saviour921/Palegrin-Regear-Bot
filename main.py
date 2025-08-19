@@ -405,7 +405,8 @@ async def liste_olustur(interaction: discord.Interaction):
         return
 
     cache_data = veri_yukle(cache_dosya_yolu)
-    lines = []
+        otomatik = []
+    manuel = []
 
     for msg_id, msg_data in cache_data.get("messages", {}).items():
         for attach_id, attach_data in msg_data.get("attachments", {}).items():
@@ -414,18 +415,28 @@ async def liste_olustur(interaction: discord.Interaction):
                 discord_name = attach_data.get("discord") or "Bilinmiyor"
                 set_name = attach_data.get("set") or "set tespit edilemedi"
                 if status == "approved_manual":
-                    line = f"{discord_name} - {set_name} - manuel olarak onaylanmıştır"
+                    manuel.append(f"{discord_name} - {set_name} - manuel olarak onaylanmıştır")
                 else:
                     player_name = attach_data.get("player") or "isim okunamadı"
-                    line = f"{discord_name} - {player_name} - {set_name}"
-                lines.append(line)
+                    otomatik.append(f"{discord_name} - {player_name} - {set_name}")
 
-    if not lines:
+    if not otomatik and not manuel:
         await interaction.followup.send(embed=discord.Embed(title="ℹ️ Bilgi", description="Hafızada listelenecek onaylanmış bir talep bulunamadı.", color=INFO_COLOR), ephemeral=True)
         return
-    
-    final_list = sorted(lines)
-    file_content = "\n".join(final_list)
+
+    lines = []
+    if otomatik:
+        lines.append("📌 Otomatik Onaylananlar:")
+        for i, entry in enumerate(sorted(otomatik), 1):
+            lines.append(f"{i}. {entry}")
+        lines.append("")
+    if manuel:
+        lines.append("📌 Manuel Onaylananlar:")
+        for i, entry in enumerate(sorted(manuel), 1):
+            lines.append(f"{i}. {entry}")
+
+    file_content = "\n".join(lines)
+file_content = "\n".join(final_list)
     buffer = io.BytesIO(file_content.encode('utf-8'))
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
     file = discord.File(buffer, filename=f"onay_listesi_{interaction.channel.name.replace(' ', '_')}_{timestamp}.txt")
