@@ -342,12 +342,21 @@ async def analiz_et(interaction: discord.Interaction):
                 image_data = await attachment.read()
                 result = await analyze_image_with_ai(image_data)
                 
-                oyuncu_adi = result.get("player_name", message.author.display_name)
-                set_adi = result.get("matched_set")
-                
-                ip = result.get("item_power") or 0
-                
-                attachment_cache = {"player": oyuncu_adi, "set": set_adi, "ip": ip}
+                # --- AI sonucu işleme (GÜNCEL) ---
+discord_adi = message.author.name  # Sunucudaki görünen Discord adı
+
+extracted_name = (result.get("player_name") or "").strip()
+oyuncu_adi = extracted_name if extracted_name else "isim okunamadı"
+
+set_adi = result.get("matched_set")
+ip = result.get("item_power") or 0
+
+attachment_cache = {
+    "discord": discord_adi,
+    "player": oyuncu_adi,
+    "set": set_adi,
+    "ip": ip
+}
 
                 if not result.get("error") and ip >= MINIMUM_IP and result.get("status") == AI_ONAY_METNI:
                     attachment_cache["status"] = "approved_auto"
@@ -404,17 +413,34 @@ async def liste_olustur(interaction: discord.Interaction):
         return
 
     cache_data = veri_yukle(cache_dosya_yolu)
-    onaylananlar_listesi = {}
+    # --- /liste-olustur içi (GÜNCEL) ---
+onaylananlar_listesi = []
 
-    for msg_id, msg_data in cache_data.get("messages", {}).items():
-        for attach_id, attach_data in msg_data.get("attachments", {}).items():
-            if "approved" in attach_data.get("status", ""):
-                player = attach_data.get("player")
-                set_name = attach_data.get("set")
-                if player:
-                    onaylananlar_listesi[player] = f"{player} - {set_name}"
+for msg_id, msg_data in cache_data.get("messages", {}).items():
+    for attach_id, attach_data in msg_data.get("attachments", {}).items():
+        status = attach_data.get("status", "")
+        if "approved" not in status:
+            continue
 
-    if not onaylananlar_listesi:
+        discord_name = attach_data.get("discord")
+        if not discord_name:
+            try:
+                msg_obj = await interaction.channel.fetch_message(int(msg_id))
+                discord_name = msg_obj.author.name
+            except Exception:
+                discord_name = "BİLİNMEYEN-DISCORD"
+
+        set_name = attach_data.get("set") or "set_bilinmiyor"
+        player_name = attach_data.get("player") or "isim okunamadı"
+
+        if status == "approved_manual":
+            line = f"{discord_name} - {set_name} - manuel olarak onaylanmıştır"
+        else:
+            line = f"{discord_name} - {player_name} - {set_name}"
+
+        onaylananlar_listesi.append(line)
+
+if not onaylananlar_listesi:
         await interaction.followup.send(embed=discord.Embed(title="ℹ️ Bilgi", description="Hafızada listelenecek onaylanmış bir talep bulunamadı.", color=INFO_COLOR), ephemeral=True)
         return
     
