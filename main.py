@@ -479,6 +479,21 @@ async def liste_olustur(interaction: discord.Interaction):
     except Exception as e:
         print(f"Hafıza dosyası silinirken bir hata oluştu: {e}")
 
+
+@client.tree.command(name="regear-duyuru", description="Regearların dağıtıldığını duyurur.")
+async def regear_duyuru(interaction: discord.Interaction):
+    message = (
+        "✅ __**REGEAR DAĞITILDI / REGEARS DELIVERED**__ ✅\n\n"
+        "🇹🇷 Bu listedeki regearlar dağıtılmıştır.  \n"
+        "🌐 https://palegrin-balance.web.app\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🇬🇧 Regears listed below have been delivered.  \n"
+        "🌐 https://palegrin-balance.web.app \n"
+        "||@everyone||"
+    )
+    await interaction.response.send_message(message)
+
+
 # ----- BOTU ÇALIŞTIRMA -----
 token = os.getenv("DISCORD_TOKEN")
 if token:
