@@ -216,6 +216,29 @@ class ManualReviewView(ui.View):
         except (IndexError, ValueError, KeyError) as e:
             print(f"Reddetme sonrası reaksiyon güncellenemedi: {e}")
 class SetDisplayView(ui.View):
+    def __init__(self, sets_data: dict, page: int = 0, per_page: int = 25):
+        super().__init__(timeout=300)
+        self.sets_data = sets_data
+        self.page = page
+        self.per_page = per_page
+        set_names = list(self.sets_data.keys())
+        start, end = page * per_page, (page + 1) * per_page
+        options = [discord.SelectOption(label=name, description=f"`{name}` setini görüntüle.") for name in set_names[start:end]]
+        if options:
+            self.add_item(self.SetSelect(options))
+        if page > 0:
+            self.add_item(self.NavButton(label="⬅️ Geri", direction=-1))
+        if end < len(set_names):
+            self.add_item(self.NavButton(label="İleri ➡️", direction=1))
+
+    class NavButton(ui.Button):
+        def __init__(self, label: str, direction: int):
+            super().__init__(label=label, style=discord.ButtonStyle.primary)
+            self.direction = direction
+        async def callback(self, interaction: discord.Interaction):
+            view: 'SetDisplayView' = self.view
+            new_page = view.page + self.direction
+            await interaction.response.edit_message(view=SetDisplayView(view.sets_data, page=new_page, per_page=view.per_page))
     def __init__(self, sets_data: dict):
         super().__init__(timeout=300)
         self.sets_data = sets_data
@@ -269,6 +292,23 @@ async def yardim(interaction: discord.Interaction):
 @client.tree.command(name="set-resmi-ekle", description="Onaylı bir regear setini resim olarak tanımlar.")
 async def set_resmi_ekle(interaction: discord.Interaction, set_adi: str, resim: discord.Attachment):
     await interaction.response.defer(thinking=True, ephemeral=True)
+    # Önce Gemini hafızasına referans setleri yükleyelim
+    onayli_setler = veri_yukle(ONAYLI_SETLER_DOSYASI)
+    if vision_model and onayli_setler:
+        preload_content = ["Sen Albion Online için regear denetleme asistanısın. Bu görseller referans setlerdir. Hafızana al ve sonraki resim analizlerinde kullan."]
+        for set_name, set_info in onayli_setler.items():
+            dosya_yolu = os.path.join(SET_IMAGES_KLASORU, set_info["filename"])
+            try:
+                with open(dosya_yolu, "rb") as f:
+                    preload_content.append(f"Set adı: {set_name}")
+                    preload_content.append({"mime_type": set_info["mime_type"], "data": f.read()})
+            except FileNotFoundError:
+                continue
+        try:
+            await vision_model.generate_content_async(preload_content)
+            print("✅ Gemini hafızasına setler yüklendi.")
+        except Exception as e:
+            print(f"Gemini hafızasına set yüklenemedi: {e}")
     try:
         set_adi = set_adi.lower().strip().replace(" ", "_")
         dosya_adi = f"{set_adi}.png"
@@ -286,6 +326,23 @@ async def set_resmi_ekle(interaction: discord.Interaction, set_adi: str, resim: 
 @client.tree.command(name="set-sil", description="Tanımlı bir set resmini siler.")
 async def set_sil(interaction: discord.Interaction, set_adi: str):
     await interaction.response.defer(thinking=True, ephemeral=True)
+    # Önce Gemini hafızasına referans setleri yükleyelim
+    onayli_setler = veri_yukle(ONAYLI_SETLER_DOSYASI)
+    if vision_model and onayli_setler:
+        preload_content = ["Sen Albion Online için regear denetleme asistanısın. Bu görseller referans setlerdir. Hafızana al ve sonraki resim analizlerinde kullan."]
+        for set_name, set_info in onayli_setler.items():
+            dosya_yolu = os.path.join(SET_IMAGES_KLASORU, set_info["filename"])
+            try:
+                with open(dosya_yolu, "rb") as f:
+                    preload_content.append(f"Set adı: {set_name}")
+                    preload_content.append({"mime_type": set_info["mime_type"], "data": f.read()})
+            except FileNotFoundError:
+                continue
+        try:
+            await vision_model.generate_content_async(preload_content)
+            print("✅ Gemini hafızasına setler yüklendi.")
+        except Exception as e:
+            print(f"Gemini hafızasına set yüklenemedi: {e}")
     set_adi = set_adi.lower().strip()
     onayli_setler = veri_yukle(ONAYLI_SETLER_DOSYASI)
     if set_adi in onayli_setler:
@@ -302,6 +359,18 @@ async def set_sil(interaction: discord.Interaction, set_adi: str):
         await interaction.followup.send(embed=discord.Embed(title="🗑️ Set Silindi", description=f"`{set_adi}` adlı set başarıyla silindi.", color=SUCCESS_COLOR))
     else:
         await interaction.followup.send(embed=discord.Embed(title="⚠️ Bulunamadı", description=f"`{set_adi}` adında bir set bulunamadı.", color=WARN_COLOR))
+
+
+@client.tree.command(name="setleri-yedekle", description="Onaylı setlerin JSON verisini indirmenizi sağlar.")
+async def setleri_yedekle(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    if not os.path.exists(ONAYLI_SETLER_DOSYASI):
+        await interaction.followup.send("Henüz kaydedilmiş set bulunamadı.", ephemeral=True)
+        return
+    with open(ONAYLI_SETLER_DOSYASI, "rb") as f:
+        buffer = io.BytesIO(f.read())
+    file = discord.File(buffer, filename="onayli_setler_yedek.json")
+    await interaction.followup.send("📦 İşte setlerin yedeği:", file=file, ephemeral=True)
 
 @client.tree.command(name="setleri-goster", description="Kaydedilmiş tüm onaylı regear setlerini interaktif olarak listeler.")
 async def setleri_goster(interaction: discord.Interaction):
@@ -320,6 +389,23 @@ async def analiz_et(interaction: discord.Interaction):
         await interaction.response.send_message(embed=discord.Embed(title="❌ Hatalı Komut Kullanımı", description="Bu komut sadece bir **konu (thread)** içinde kullanılabilir.", color=ERROR_COLOR), ephemeral=True)
         return
     await interaction.response.defer(thinking=True, ephemeral=True)
+    # Önce Gemini hafızasına referans setleri yükleyelim
+    onayli_setler = veri_yukle(ONAYLI_SETLER_DOSYASI)
+    if vision_model and onayli_setler:
+        preload_content = ["Sen Albion Online için regear denetleme asistanısın. Bu görseller referans setlerdir. Hafızana al ve sonraki resim analizlerinde kullan."]
+        for set_name, set_info in onayli_setler.items():
+            dosya_yolu = os.path.join(SET_IMAGES_KLASORU, set_info["filename"])
+            try:
+                with open(dosya_yolu, "rb") as f:
+                    preload_content.append(f"Set adı: {set_name}")
+                    preload_content.append({"mime_type": set_info["mime_type"], "data": f.read()})
+            except FileNotFoundError:
+                continue
+        try:
+            await vision_model.generate_content_async(preload_content)
+            print("✅ Gemini hafızasına setler yüklendi.")
+        except Exception as e:
+            print(f"Gemini hafızasına set yüklenemedi: {e}")
     
     cache_dosya_yolu = os.path.join(ANALYSIS_CACHE_KLASORU, f"{interaction.channel.id}.json")
     cache_data = {"messages": {}}
@@ -412,6 +498,23 @@ async def liste_olustur(interaction: discord.Interaction):
         await interaction.response.send_message("Bu komut sadece bir konu (thread) içinde kullanılabilir.", ephemeral=True)
         return
     await interaction.response.defer(thinking=True, ephemeral=True)
+    # Önce Gemini hafızasına referans setleri yükleyelim
+    onayli_setler = veri_yukle(ONAYLI_SETLER_DOSYASI)
+    if vision_model and onayli_setler:
+        preload_content = ["Sen Albion Online için regear denetleme asistanısın. Bu görseller referans setlerdir. Hafızana al ve sonraki resim analizlerinde kullan."]
+        for set_name, set_info in onayli_setler.items():
+            dosya_yolu = os.path.join(SET_IMAGES_KLASORU, set_info["filename"])
+            try:
+                with open(dosya_yolu, "rb") as f:
+                    preload_content.append(f"Set adı: {set_name}")
+                    preload_content.append({"mime_type": set_info["mime_type"], "data": f.read()})
+            except FileNotFoundError:
+                continue
+        try:
+            await vision_model.generate_content_async(preload_content)
+            print("✅ Gemini hafızasına setler yüklendi.")
+        except Exception as e:
+            print(f"Gemini hafızasına set yüklenemedi: {e}")
     
     cache_dosya_yolu = os.path.join(ANALYSIS_CACHE_KLASORU, f"{interaction.channel.id}.json")
     if not os.path.exists(cache_dosya_yolu):
